@@ -11,7 +11,18 @@
   (compiler compile))
 
 ;; --- Configuration ---
+;; Source .ss files come from the gerbil-lsp submodule, with local overrides
+(define submodule-dir "gerbil-lsp")
 (define output-dir "src/lsp")
+
+;; Find source file: check local override first, then submodule
+(define (find-source path)
+  (let ((local (string-append "./" path))
+        (sub   (string-append submodule-dir "/" path)))
+    (cond
+      ((file-exists? local) local)
+      ((file-exists? sub)   sub)
+      (else (error 'find-source "source file not found" path)))))
 
 ;; --- Import map: Gerbil module → Chez library ---
 ;; *default-package* sets the package for unmapped relative imports
@@ -268,13 +279,15 @@
     (else #f)))
 
 ;; --- Module compilation ---
-;; Compile a module from source-dir/name.ss to output-dir/flat-name.sls
+;; Compile a module from source .ss to output-dir/flat-name.sls
+;; Uses find-source to check local overrides first, then submodule
 (define (compile-module source-path flat-name)
-  (let* ((output-path (string-append output-dir "/" flat-name ".sls"))
+  (let* ((input-path (find-source source-path))
+         (output-path (string-append output-dir "/" flat-name ".sls"))
          (lib-name `(lsp ,(string->symbol flat-name))))
-    (display (string-append "  Compiling: " source-path " → " flat-name ".sls\n"))
+    (display (string-append "  Compiling: " input-path " → " flat-name ".sls\n"))
     (guard (exn
-             (#t (display (string-append "  ERROR: " source-path " failed: "))
+             (#t (display (string-append "  ERROR: " input-path " failed: "))
                  (display (condition-message exn))
                  (when (irritants-condition? exn)
                    (display " — ")
@@ -282,7 +295,7 @@
                  (newline)
                  #f))
       (let* ((lib-form (gerbil-compile-to-library
-                         source-path lib-name
+                         input-path lib-name
                          lsp-import-map lsp-base-imports))
              (lib-form (fix-import-conflicts lib-form)))
         (call-with-output-file output-path

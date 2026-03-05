@@ -1,0 +1,3 @@
+[submodule "gerbil-lsp"]
+	path = gerbil-lsp
+	url = https://github.com/ober/gerbil-lsp.git
